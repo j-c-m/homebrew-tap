@@ -1,18 +1,7 @@
-# J-c-m Tap
+# j-c-m Tap
 
 ## How do I install these formulae?
 
 `brew install j-c-m/tap/<formula>`
 
 Or `brew tap j-c-m/tap` and then `brew install <formula>`.
-
-Or, in a `brew bundle` `Brewfile`:
-
-```ruby
-tap "j-c-m/tap"
-brew "<formula>"
-```
-
-## Documentation
-
-`brew help`, `man brew` or check [Homebrew's documentation](https://docs.brew.sh).
