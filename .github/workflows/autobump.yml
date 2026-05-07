@@ -1,0 +1,129 @@
+name: Autobump
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      formulas: ${{ steps.detect.outputs.formulas }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect outdated formulas
+        id: detect
+        run: |
+          FORMULAS_JSON="[]"
+          for formula in Formula/*.rb; do
+            [ -f "$formula" ] || continue
+            name=$(basename "$formula" .rb)
+            current_url=$(grep -o 'url ".*"' "$formula" | head -1 | cut -d'"' -f2)
+            if echo "$current_url" | grep -q 'github.com.*/archive/refs/tags/'; then
+              owner_repo=$(echo "$current_url" | sed -E 's|https://github.com/([^/]+/[^/]+)/.*|\1|')
+              latest_tag=$(curl -sL "https://api.github.com/repos/${owner_repo}/releases/latest" | jq -r '.tag_name // empty')
+              if [ -n "$latest_tag" ]; then
+                latest_version=${latest_tag#v}
+                current_version=$(echo "$current_url" | sed -E 's|.*/v?([0-9.]+)\.tar\.gz|\1|')
+                if [ "$latest_version" != "$current_version" ]; then
+                  tarball_url="https://github.com/${owner_repo}/archive/refs/tags/v${latest_version}.tar.gz"
+                  tarball_sha=$(curl -sL "$tarball_url" | sha256sum | cut -d' ' -f1)
+                  FORMULAS_JSON=$(echo "$FORMULAS_JSON" | jq --arg name "$name" --arg version "$latest_version" --arg url "$tarball_url" --arg sha "$tarball_sha" '. += [{"name":$name,"version":$version,"url":$url,"sha":$sha}]')
+                fi
+              fi
+            fi
+          done
+          echo "formulas=$(echo "$FORMULAS_JSON" | jq -c '.')" >> $GITHUB_OUTPUT
+          echo "Found formulas to bump: $(echo "$FORMULAS_JSON" | jq -c '.')" 
+
+  build:
+    needs: detect
+    if: needs.detect.outputs.formulas != '[]'
+    strategy:
+      matrix:
+        include:
+          - os: macos-15-intel
+          - os: macos-26
+          - os: ubuntu-latest
+            container: ghcr.io/homebrew/brew:main
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    steps:
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+
+      - uses: actions/checkout@v4
+
+      - name: Build bottles
+        env:
+          FORMULAS: ${{ needs.detect.outputs.formulas }}
+        run: |
+          echo "$FORMULAS" | jq -c '.[]' | while read -r f; do
+            name=$(echo "$f" | jq -r '.name')
+            url=$(echo "$f" | jq -r '.url')
+            sha=$(echo "$f" | jq -r '.sha')
+            version=$(echo "$f" | jq -r '.version')
+
+            # Patch formula with new version
+            sed -i.bak "s|url \".*\"|url \"$url\"|" "Formula/${name}.rb"
+            sed -i.bak "s|sha256 \".*\"|sha256 \"$sha\"|" "Formula/${name}.rb"
+
+            brew install --build-bottle "$name"
+            brew bottle --no-rebuild --skip-relocation "$name"
+          done
+
+      - name: Upload bottles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottles-${{ matrix.os }}
+          path: '*.bottle.*'
+
+  release:
+    needs: [detect, build]
+    if: needs.detect.outputs.formulas != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all bottles
+        uses: actions/download-artifact@v4
+        with:
+          path: bottles
+          merge-multiple: true
+
+      - name: Update formulas and create release
+        env:
+          FORMULAS: ${{ needs.detect.outputs.formulas }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$FORMULAS" | jq -c '.[]' | while read -r f; do
+            name=$(echo "$f" | jq -r '.name')
+            version=$(echo "$f" | jq -r '.version')
+            url=$(echo "$f" | jq -r '.url')
+            sha=$(echo "$f" | jq -r '.sha')
+
+            # Generate bottle block
+            bottle_block=$(brew bottle --merge --write --no-commit Formula/${name}.rb 2>/dev/null || true)
+
+            # Update url/sha (in case merge didn't)
+            sed -i "s|url \".*\"|url \"$url\"|" "Formula/${name}.rb"
+            sed -i "s|sha256 \".*\"|sha256 \"$sha\"|" "Formula/${name}.rb"
+
+            # Commit
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "Formula/${name}.rb"
+            git commit -m "${name} ${version}" || true
+
+            # Create release and upload bottles
+            gh release create "${name}-${version}" bottles/*.bottle.* \
+              --title "${name} ${version}" \
+              --generate-notes || true
+          done
+
+          git push origin main
