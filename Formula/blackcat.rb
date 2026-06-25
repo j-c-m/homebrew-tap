@@ -6,9 +6,9 @@ class Blackcat < Formula
   license "MIT"
 
   bottle do
-    root_url "https://github.com/j-c-m/homebrew-tap/releases/download/blackcat-0.7.1"
-    sha256 cellar: :any_skip_relocation, arm64_tahoe:  "66e0d3f849bec102945d85708d3d424d57c646dfa0b24ccba50704aa10985fcf"
-    sha256 cellar: :any_skip_relocation, x86_64_linux: "eb45076b9b7e11d4373e4c592ac86f0051a0b6faad0b81dbac8b62532c419651"
+    root_url "https://github.com/j-c-m/homebrew-tap/releases/download/blackcat-0.7.2"
+    sha256 cellar: :any_skip_relocation, arm64_tahoe:  "b27d0a4060d7195761709b710c95703b0b08b3a25ada602b7d06b58f13e9900d"
+    sha256 cellar: :any_skip_relocation, x86_64_linux: "012d696d8d3e690afa16cd6a6c4834a151408d9f957581bd7311fc3e0b5437d8"
   end
 
   depends_on "zig@0.16" => :build
