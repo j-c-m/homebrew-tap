@@ -1,8 +1,8 @@
 class Blackcat < Formula
   desc "Modern cat with Kitty graphics protocol, ANSI rendering, DOS/CP437 support"
   homepage "https://github.com/j-c-m/blackcat"
-  url "https://github.com/j-c-m/blackcat/archive/refs/tags/v0.8.2.tar.gz"
-  sha256 "12cde2444e928c265799be3e92ab56a71ca00426f0712b7f3dfa801fc972167c"
+  url "https://github.com/j-c-m/blackcat/archive/refs/tags/v0.8.3.tar.gz"
+  sha256 "cca66c83a3dfe6bafa82f38d792fce12c55222babc5194df636cbaae577235f1"
   license "MIT"
 
   bottle do
