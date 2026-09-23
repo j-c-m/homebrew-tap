@@ -1,8 +1,8 @@
 class Blackcat < Formula
   desc "Modern cat with Kitty graphics protocol, ANSI rendering, DOS/CP437 support"
   homepage "https://github.com/j-c-m/blackcat"
-  url "https://github.com/j-c-m/blackcat/archive/refs/tags/v0.8.3.tar.gz"
-  sha256 "cca66c83a3dfe6bafa82f38d792fce12c55222babc5194df636cbaae577235f1"
+  url "https://github.com/j-c-m/blackcat/archive/refs/tags/v0.9.0.tar.gz"
+  sha256 "4e5259c56985e255f4a57a9547a9fc11e5f66cabeb8817ccefa0e0b08b9c2d7a"
   license "MIT"
 
   bottle do
@@ -11,11 +11,10 @@ class Blackcat < Formula
     sha256 cellar: :any_skip_relocation, x86_64_linux: "9f0bbdb8255688cf5ef8df15f09c224a5c5bf432e05488ef0879749b65ef9b6b"
   end
 
-  depends_on "zig@0.16" => :build
+  depends_on "rust" => :build
 
   def install
-    system "zig", "build", "-Doptimize=ReleaseSmall", "-Dpackage_release=false"
-    bin.install "zig-out/bin/blackcat"
+    system "cargo", "install", *std_cargo_args
   end
 
   test do
